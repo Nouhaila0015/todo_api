@@ -1,7 +1,104 @@
 import express from "express";
 import Utilisateur from "../models/Utilisateur.model.js";
+import bcrypt from "bcrypt";
+
+const app = express();
 
 const routerUtilisateur = express.Router();
+
+// **1. Register User**
+routerUtilisateur.post("/register", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const existingUser = await Utilisateur.findOne({ where: { username } });
+    if (existingUser) {
+      return res.status(400).json({ error: "Username already exists." });
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    const newUtilisateur = await Utilisateur.create({
+      username,
+      password: hashedPassword,
+    });
+
+    res.status(201).json({
+      message: "User registered successfully.",
+      user: {
+        id: newUtilisateur.id_user,
+        username: newUtilisateur.username,
+      },
+    });
+  } catch (error) {
+    console.error("Error during registration:", error);
+    res.status(500).json({ error: "An unexpected error occurred." });
+  }
+});
+
+// **2. Login User**
+routerUtilisateur.post("/login", async (req, res) => {
+  const { username, password } = req.body;
+
+  try {
+    const user = await Utilisateur.findOne({ where: { username } });
+    if (!user) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(401).json({ error: "Invalid username or password." });
+    }
+
+    // Save session details
+    req.session.user = {
+      id: user.id_user,
+      username: user.username,
+    };
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user.id_user,
+        username: user.username,
+      },
+    });
+  } catch (error) {
+    console.error("Error during login:", error);
+    res.status(500).json({ error: "An unexpected error occurred." });
+  }
+});
+
+// **3. Logout**
+routerUtilisateur.post("/logout", (req, res) => {
+  req.session.destroy();
+  res.status(200).json({ message: "Logout successful" });
+});
+
+// **4. Verify Session**
+routerUtilisateur.get("/verify-session", (req, res) => {
+  if (req.session.user) {
+    res.status(200).json({ user: req.session.user });
+  } else {
+    res.status(401).json({ error: "Not authenticated" });
+  }
+});
+
+// **5. DELETE utilisateur**
+routerUtilisateur.delete("/:id", async (req, res) => {
+    try {
+        const utilisateur = await Utilisateur.findByPk(req.params.id);
+        if (!utilisateur) {
+            return res.status(404).json({ error: "Utilisateur not found" });
+        }
+        await utilisateur.destroy();
+        res.status(200).json({ message: "Utilisateur deleted successfully" });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // **1. GET all utilisateurs**
 routerUtilisateur.get("/", async (req, res) => {
@@ -49,20 +146,6 @@ routerUtilisateur.put("/:id", async (req, res) => {
         utilisateur.password = password || utilisateur.password;
         await utilisateur.save();
         res.status(200).json(utilisateur);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
-
-// **5. DELETE utilisateur**
-routerUtilisateur.delete("/:id", async (req, res) => {
-    try {
-        const utilisateur = await Utilisateur.findByPk(req.params.id);
-        if (!utilisateur) {
-            return res.status(404).json({ error: "Utilisateur not found" });
-        }
-        await utilisateur.destroy();
-        res.status(200).json({ message: "Utilisateur deleted successfully" });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
