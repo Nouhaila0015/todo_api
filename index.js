@@ -14,9 +14,16 @@ import routerCollaboration from "./src/routes/collaboration.route.js";
 const app = express();
 const port = 3001;
 
-// Middleware
+// Middleware: CORS Configuration
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3002"];
 app.use(cors({
-    origin: "http://localhost:3000", // Frontend URL
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
     credentials: true, // Allow cookies
 }));
 app.use(express.json());
@@ -46,6 +53,3 @@ app.listen(port, () => {
 sequelize.sync().then(() => {
     console.log("Database & tables created.");
 });
-
-      
- 
