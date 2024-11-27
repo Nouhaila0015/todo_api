@@ -8,12 +8,12 @@ const routerUtilisateur = express.Router();
 
 // **1. Register User**
 routerUtilisateur.post("/register", async (req, res) => {
-  const { username, password } = req.body;
+  const { username, email, password } = req.body;
 
   try {
-    const existingUser = await Utilisateur.findOne({ where: { username } });
+    const existingUser = await Utilisateur.findOne({ where: { email } });
     if (existingUser) {
-      return res.status(400).json({ error: "Username already exists." });
+      return res.status(400).json({ error: "Email already exists." });
     }
 
     const saltRounds = 10;
@@ -21,6 +21,7 @@ routerUtilisateur.post("/register", async (req, res) => {
 
     const newUtilisateur = await Utilisateur.create({
       username,
+      email,
       password: hashedPassword,
     });
 
@@ -29,6 +30,7 @@ routerUtilisateur.post("/register", async (req, res) => {
       user: {
         id: newUtilisateur.id_user,
         username: newUtilisateur.username,
+        email: newUtilisateur.email,
       },
     });
   } catch (error) {
@@ -39,23 +41,24 @@ routerUtilisateur.post("/register", async (req, res) => {
 
 // **2. Login User**
 routerUtilisateur.post("/login", async (req, res) => {
-  const { username, password } = req.body;
+  const { email, password } = req.body;
 
   try {
-    const user = await Utilisateur.findOne({ where: { username } });
+    const user = await Utilisateur.findOne({ where: { email } });
     if (!user) {
-      return res.status(401).json({ error: "Invalid username or password." });
+      return res.status(401).json({ error: "Invalid email or password." });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(401).json({ error: "Invalid username or password." });
+      return res.status(401).json({ error: "Invalid email or password." });
     }
 
     // Save session details
     req.session.user = {
       id: user.id_user,
       username: user.username,
+      email: user.email,
     };
 
     res.status(200).json({
@@ -63,6 +66,7 @@ routerUtilisateur.post("/login", async (req, res) => {
       user: {
         id: user.id_user,
         username: user.username,
+        email: user.email,
       },
     });
   } catch (error) {
@@ -70,6 +74,7 @@ routerUtilisateur.post("/login", async (req, res) => {
     res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
+
 
 // **3. Logout**
 routerUtilisateur.post("/logout", (req, res) => {

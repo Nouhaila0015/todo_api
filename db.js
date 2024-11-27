@@ -5,12 +5,13 @@ const sequelize = new Sequelize({
     storage: './database.sqlite'
 });
 
-sequelize.authenticate()
+sequelize.sync({ alter: true })
     .then(() => {
-        console.log('Connection has been established successfully.');
+        console.log('Database synchronized');
     })
     .catch(err => {
-        console.error('Unable to connect to the database:', err);
+        console.error('Unable to synchronize the database:', err);
     });
+
 
 export default sequelize;
