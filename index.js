@@ -15,7 +15,7 @@ const app = express();
 const port = 3001;
 
 // Middleware: CORS Configuration
-const allowedOrigins = ["http://localhost:3000", "http://localhost:3002"];
+const allowedOrigins = ["http://localhost:3000", "http://localhost:3001"];
 app.use(cors({
     origin: function (origin, callback) {
         if (!origin || allowedOrigins.includes(origin)) {
