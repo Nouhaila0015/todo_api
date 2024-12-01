@@ -1,41 +1,57 @@
 import express from "express";
 import Utilisateur from "../models/Utilisateur.model.js";
+import Projet from "../models/Projet.model.js";
 import bcrypt from "bcrypt";
 
 const app = express();
 
 const routerUtilisateur = express.Router();
 
-// **1. Register User**
 routerUtilisateur.post("/register", async (req, res) => {
   const { username, email, password } = req.body;
 
   try {
-    const existingUser = await Utilisateur.findOne({ where: { email } });
-    if (existingUser) {
-      return res.status(400).json({ error: "Email already exists." });
-    }
+      const existingUser = await Utilisateur.findOne({ where: { email } });
+      if (existingUser) {
+          return res.status(400).json({ error: "Email already exists." });
+      }
 
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(password, saltRounds);
+      const saltRounds = 10;
+      const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    const newUtilisateur = await Utilisateur.create({
-      username,
-      email,
-      password: hashedPassword,
-    });
+      const newUtilisateur = await Utilisateur.create({
+          username,
+          email,
+          password: hashedPassword,
+      });
 
-    res.status(201).json({
-      message: "User registered successfully.",
-      user: {
-        id: newUtilisateur.id_user,
-        username: newUtilisateur.username,
-        email: newUtilisateur.email,
-      },
-    });
+      // Créer une session pour le nouvel utilisateur
+      req.session.user = {
+          id: newUtilisateur.id_user,
+          username: newUtilisateur.username,
+          email: newUtilisateur.email,
+      };
+
+      // Créer les projets par défaut
+      const defaultProjects = [
+          { titre: "Ma journée", created_by: newUtilisateur.id_user },
+          { titre: "Important", created_by: newUtilisateur.id_user },
+          { titre: "Deadline", created_by: newUtilisateur.id_user }
+      ];
+
+      await Promise.all(defaultProjects.map(project => Projet.create(project)));
+
+      res.status(201).json({
+          message: "User registered successfully.",
+          user: {
+              id: newUtilisateur.id_user,
+              username: newUtilisateur.username,
+              email: newUtilisateur.email,
+          },
+      });
   } catch (error) {
-    console.error("Error during registration:", error);
-    res.status(500).json({ error: "An unexpected error occurred." });
+      console.error("Error during registration:", error);
+      res.status(500).json({ error: "An unexpected error occurred." });
   }
 });
 
