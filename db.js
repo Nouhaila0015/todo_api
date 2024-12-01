@@ -2,10 +2,13 @@ import { Sequelize } from "sequelize";
 
 const sequelize = new Sequelize({
     dialect: 'sqlite',
-    storage: './database.sqlite'
+    storage: './database.sqlite' ,dialectOptions: {
+        timeout: 10000, // Timeout in milliseconds
+    },
 });
 
-sequelize.sync({ alter: true })
+await sequelize.sync({ force: true })
+
     .then(() => {
         console.log('Database synchronized');
     })
