@@ -36,24 +36,35 @@ notificationRoutes.get('/', async (req, res) => {
         });
         res.json(notifications);
     } catch (error) {
+        console.error('Error fetching notifications:', error);
         res.status(500).json({ message: error.message });
     }
 });
 
 // Créer une nouvelle notification
-notificationRoutes.post('/', async (req, res) => {
+notificationRoutes.post('/', checkAuth, async (req, res) => {
     try {
-        const { user_id, message, type, projet_id } = req.body;
+        const { user_email, message, type, projectId } = req.body;
+        
+        // Trouver l'utilisateur invité
+        const invitedUser = await Utilisateur.findOne({ where: { email: user_email } });
+        if (!invitedUser) {
+            return res.status(404).json({ message: "Utilisateur non trouvé" });
+        }
+
+        // Créer la notification
         const notification = await Notification.create({
-            user_id,
-            sender_id: req.session.user.id,
+            user_id: invitedUser.id_user,
             message,
             type,
-            projet_id,
-            status: type === 'INVITATION' ? 'PENDING' : 'NONE'
+            projet_id: projectId,
+            sender_id: req.session.user.id,
+            isRead: false
         });
+
         res.status(201).json(notification);
     } catch (error) {
+        console.error('Error creating notification:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -75,6 +86,7 @@ notificationRoutes.put('/:id/read', async (req, res) => {
         await notification.update({ isRead: true });
         res.json(notification);
     } catch (error) {
+        console.error('Error marking notification as read:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -105,6 +117,7 @@ notificationRoutes.put('/:id/accept', async (req, res) => {
 
         res.json(notification);
     } catch (error) {
+        console.error('Error accepting invitation:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -131,6 +144,7 @@ notificationRoutes.put('/:id/decline', async (req, res) => {
         });
         res.json(notification);
     } catch (error) {
+        console.error('Error declining invitation:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -152,6 +166,7 @@ notificationRoutes.delete('/:id', async (req, res) => {
         await notification.destroy();
         res.status(204).send();
     } catch (error) {
+        console.error('Error deleting notification:', error);
         res.status(500).json({ message: error.message });
     }
 });
@@ -170,6 +185,7 @@ notificationRoutes.put('/read-all', async (req, res) => {
         );
         res.json({ message: "Toutes les notifications ont été marquées comme lues" });
     } catch (error) {
+        console.error('Error marking notifications as read:', error);
         res.status(500).json({ message: error.message });
     }
 });

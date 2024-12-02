@@ -6,97 +6,123 @@ import Permission from '../models/Permission.model.js';
 
 const routerCollaboration = express.Router();
 
-// Route pour récupérer toutes les collaborations
-routerCollaboration.get('/collaborations', async (req, res) => {
+// Middleware d'authentification
+const checkAuth = (req, res, next) => {
+    if (!req.session.user) {
+        return res.status(401).json({ message: "Non authentifié" });
+    }
+    next();
+};
+
+// Appliquer le middleware à toutes les routes
+routerCollaboration.use(checkAuth);
+
+// Inviter un utilisateur par email
+routerCollaboration.post('/invite', async (req, res) => {
+    const { email, projectId, permission } = req.body;
+
+    try {
+        // Vérifier si l'utilisateur invité existe
+        const invitedUser = await Utilisateur.findOne({ where: { email } });
+        if (!invitedUser) {
+            return res.status(404).json({ message: "Utilisateur non trouvé" });
+        }
+
+        // Vérifier si l'utilisateur est déjà membre du projet
+        const existingCollaboration = await Collaboration.findOne({
+            where: {
+                id_membre: invitedUser.id_user,
+                id_projet: projectId
+            }
+        });
+
+        if (existingCollaboration) {
+            return res.status(400).json({ message: "L'utilisateur est déjà membre de ce projet" });
+        }
+
+        // Trouver la permission
+        const permissionRecord = await Permission.findOne({
+            where: { desc: permission }
+        });
+
+        if (!permissionRecord) {
+            return res.status(404).json({ message: "Permission invalide" });
+        }
+
+        // Créer la collaboration
+        const collaboration = await Collaboration.create({
+            id_membre: invitedUser.id_user,
+            id_projet: projectId,
+            id_permission: permissionRecord.id_permission
+        });
+
+        res.status(201).json({
+            message: "Invitation envoyée avec succès",
+            collaboration
+        });
+    } catch (error) {
+        res.status(500).json({ message: "Erreur lors de l'invitation", error: error.message });
+    }
+});
+
+// Obtenir tous les membres d'un projet
+routerCollaboration.get('/projet/:projectId/members', async (req, res) => {
     try {
         const collaborations = await Collaboration.findAll({
+            where: { id_projet: req.params.projectId },
             include: [
-                { model: Utilisateur, attributes: ['id', 'nom', 'prenom'] }, // Inclut les informations de l'utilisateur
-                { model: Projet, attributes: ['id', 'nom'] }, // Inclut les informations du projet
-                { model: Permission, attributes: ['id', 'desc'] } // Inclut les informations de la permission
+                { 
+                    model: Utilisateur,
+                    attributes: ['id_user', 'username', 'email']
+                },
+                {
+                    model: Permission,
+                    attributes: ['desc']
+                }
             ]
         });
         res.json(collaborations);
     } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la récupération des collaborations', error });
+        res.status(500).json({ message: "Erreur lors de la récupération des membres", error: error.message });
     }
 });
 
-// Route pour créer une nouvelle collaboration
-routerCollaboration.post('/collaborations', async (req, res) => {
-    const { id_membre, id_projet, id_permission } = req.body;
-
-    if (!id_membre || !id_projet || !id_permission) {
-        return res.status(400).json({ message: 'Les champs id_membre, id_projet et id_permission sont requis.' });
-    }
-
+// Modifier le rôle d'un membre
+routerCollaboration.put('/:collaborationId/permission', async (req, res) => {
+    const { permission } = req.body;
     try {
-        const collaboration = await Collaboration.create({ id_membre, id_projet, id_permission });
-        res.status(201).json(collaboration);
-    } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la création de la collaboration', error });
-    }
-});
-
-// Route pour récupérer une collaboration spécifique par son ID
-routerCollaboration.get('/collaborations/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const collaboration = await Collaboration.findByPk(id, {
-            include: [
-                { model: Utilisateur, attributes: ['id', 'nom', 'prenom'] },
-                { model: Projet, attributes: ['id', 'nom'] },
-                { model: Permission, attributes: ['id', 'desc'] }
-            ]
+        const permissionRecord = await Permission.findOne({
+            where: { desc: permission }
         });
-        if (!collaboration) {
-            return res.status(404).json({ message: 'Collaboration non trouvée' });
+
+        if (!permissionRecord) {
+            return res.status(404).json({ message: "Permission invalide" });
         }
+
+        const collaboration = await Collaboration.findByPk(req.params.collaborationId);
+        if (!collaboration) {
+            return res.status(404).json({ message: "Collaboration non trouvée" });
+        }
+
+        await collaboration.update({ id_permission: permissionRecord.id_permission });
         res.json(collaboration);
     } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la récupération de la collaboration', error });
+        res.status(500).json({ message: "Erreur lors de la modification du rôle", error: error.message });
     }
 });
 
-// Route pour mettre à jour une collaboration
-routerCollaboration.put('/collaborations/:id', async (req, res) => {
-    const { id } = req.params;
-    const { id_membre, id_projet, id_permission } = req.body;
-
-    if (!id_membre || !id_projet || !id_permission) {
-        return res.status(400).json({ message: 'Les champs id_membre, id_projet et id_permission sont requis.' });
-    }
-
+// Retirer un membre du projet
+routerCollaboration.delete('/:collaborationId', async (req, res) => {
     try {
-        const collaboration = await Collaboration.findByPk(id);
+        const collaboration = await Collaboration.findByPk(req.params.collaborationId);
         if (!collaboration) {
-            return res.status(404).json({ message: 'Collaboration non trouvée' });
-        }
-
-        collaboration.id_membre = id_membre;
-        collaboration.id_projet = id_projet;
-        collaboration.id_permission = id_permission;
-
-        await collaboration.save();
-        res.json(collaboration);
-    } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la mise à jour de la collaboration', error });
-    }
-});
-
-// Route pour supprimer une collaboration
-routerCollaboration.delete('/collaborations/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const collaboration = await Collaboration.findByPk(id);
-        if (!collaboration) {
-            return res.status(404).json({ message: 'Collaboration non trouvée' });
+            return res.status(404).json({ message: "Collaboration non trouvée" });
         }
 
         await collaboration.destroy();
-        res.status(204).end();
+        res.status(204).send();
     } catch (error) {
-        res.status(500).json({ message: 'Erreur lors de la suppression de la collaboration', error });
+        res.status(500).json({ message: "Erreur lors du retrait du membre", error: error.message });
     }
 });
 
