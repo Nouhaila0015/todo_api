@@ -10,6 +10,8 @@ import routerUtilisateur from "./src/routes/utilisateur.routes.js";
 import routerStatus from "./src/routes/status.routes.js";
 import routerPermission from "./src/routes/permission.route.js";
 import routerCollaboration from "./src/routes/collaboration.route.js";
+import notificationRoutes from './src/routes/Notification.route.js';
+
 
 const app = express();
 const port = 3001;
@@ -43,6 +45,7 @@ app.use("/utilisateurs", routerUtilisateur); // Login/Registration route
 app.use("/status", routerStatus);
 app.use("/permissions", routerPermission);
 app.use("/collaborations", routerCollaboration);
+app.use('/notifications', notificationRoutes);
 
 // Start the server
 app.listen(port, () => {
